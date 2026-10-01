@@ -1,0 +1,91 @@
+[
+  {
+    "name": "Discover and order a nearby product",
+    "sanity": true,
+    "viewport": "mobile",
+    "covers": [
+      "customer discovery",
+      "product search",
+      "server-side pricing",
+      "order creation",
+      "orders persistence"
+    ],
+    "description": "Verifies the main shopping flow from search through server-validated checkout and order history.",
+    "steps": [
+      "Open LocalHub",
+      "Search for Basmati Rice",
+      "Add Basmati Rice",
+      "Checkout with COD",
+      "Open Orders"
+    ],
+    "expected": "A confirmed order appears with a server-calculated PKR total."
+  },
+  {
+    "name": "Request a local service",
+    "viewport": "mobile",
+    "covers": [
+      "service marketplace",
+      "provider discovery",
+      "booking creation"
+    ],
+    "description": "Verifies a customer can discover and request a local professional.",
+    "steps": [
+      "Open Services",
+      "Choose Emergency Plumbing",
+      "Tap Book now",
+      "Open Orders"
+    ],
+    "expected": "A pending booking activity appears in Orders."
+  },
+  {
+    "name": "Use role dashboards",
+    "viewport": "desktop",
+    "covers": [
+      "authentication",
+      "role selection",
+      "seller dashboard",
+      "provider dashboard",
+      "admin dashboard"
+    ],
+    "description": "Verifies development role access exposes the corresponding operational dashboard surfaces.",
+    "steps": [
+      "Open account",
+      "Choose ADMIN",
+      "Continue",
+      "Open Admin dashboard"
+    ],
+    "expected": "The Admin control center is displayed with management and analytics sections."
+  },
+  {
+    "name": "Use grounded AI assistance",
+    "viewport": "desktop",
+    "covers": [
+      "AI assistant",
+      "catalog-grounded recommendations",
+      "AI failure-safe behavior"
+    ],
+    "description": "Verifies natural-language discovery is answered using platform catalog context.",
+    "steps": [
+      "Open Ask LocalHub AI",
+      "Ask for groceries under Rs. 3000",
+      "Submit"
+    ],
+    "expected": "A grounded response is rendered without claiming an order or payment."
+  },
+  {
+    "name": "Reject invalid checkout",
+    "viewport": "desktop",
+    "covers": [
+      "validation guardrail",
+      "out-of-stock protection",
+      "empty cart protection"
+    ],
+    "description": "Verifies invalid checkout input cannot create an order.",
+    "steps": [
+      "Open Shop",
+      "Do not add products",
+      "Attempt checkout if available"
+    ],
+    "expected": "LocalHub prevents the invalid operation and explains that the cart is empty."
+  }
+]

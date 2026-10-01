@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+body{width:330px;background:#0b132b;color:#fff;font:13px system-ui;padding:14px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.card{background:#1c2541;padding:10px;border-radius:8px}
+.v{font-size:20px;font-weight:700}
+.small{color:#9ca3af;font-size:11px}
+.alert{margin-top:6px;padding:7px;border-radius:6px;background:#3b1d1d}
+</style>
+</head>
+<body>
+<h3>VICIdial AI Monitor V2</h3>
+<div class="grid">
+<div class="card"><div id="call" class="v">0</div><div class="small">IN CALL</div></div>
+<div class="card"><div id="queue" class="v">0</div><div class="small">QUEUE</div></div>
+<div class="card"><div id="drop" class="v">0%</div><div class="small">DROP</div></div>
+<div class="card"><div id="score" class="v">--</div><div class="small">HEALTH</div></div>
+</div>
+<div id="alerts"></div>
+<script>
+function render(x){
+ const m=x?.raw||x?.metrics, i=x?.ai_insights;
+ if(!m)return;
+ call.textContent=m.agents_in_call||0;
+ queue.textContent=m.calls_in_queue||0;
+ drop.textContent=(m.drop_percent||0)+"%";
+ score.textContent=(i?.efficiency_score ?? "--")+"/100";
+ alerts.innerHTML=(i?.alerts||[]).map(a=>`<div class="alert"><b>${a.severity}</b> ${a.message}</div>`).join("");
+}
+chrome.runtime.sendMessage({type:"STATE"}, render);
+chrome.runtime.onMessage?.addListener(()=>chrome.runtime.sendMessage({type:"STATE"},render));
+</script>
+</body>
+</html>

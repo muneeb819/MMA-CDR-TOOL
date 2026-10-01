@@ -1,0 +1,32 @@
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql" url = env("DATABASE_URL") }
+enum Role { CUSTOMER SELLER BUSINESS SERVICE_PROVIDER DELIVERY_PARTNER ADMIN SUPER_ADMIN SUPPORT_AGENT }
+enum VerificationStatus { UNVERIFIED PENDING VERIFIED REJECTED SUSPENDED }
+enum PricingModel { FIXED_PRICE HOURLY STARTING_FROM QUOTE_REQUIRED }
+enum OrderStatus { PENDING CONFIRMED PREPARING READY PICKED_UP OUT_FOR_DELIVERY DELIVERED CANCELLED REFUNDED FAILED }
+enum BookingStatus { PENDING ACCEPTED REJECTED SCHEDULED IN_PROGRESS COMPLETED CANCELLED }
+model User { id String @id @default(cuid()) email String? @unique phone String? @unique name String passwordHash String? createdAt DateTime @default(now()) updatedAt DateTime @updatedAt roles UserRole[] addresses Address[] listings MarketplaceListing[] reviews Review[] }
+model Role { id String @id @default(cuid()) name String @unique users UserRole[] }
+model UserRole { userId String roleId String user User @relation(fields:[userId],references:[id],onDelete: Cascade) role Role @relation(fields:[roleId],references:[id],onDelete: Cascade) @@id([userId,roleId]) @@index([roleId]) }
+model Address { id String @id @default(cuid()) userId String label String line1 String city String postalCode String? latitude Decimal? longitude Decimal? user User @relation(fields:[userId],references:[id],onDelete: Cascade) @@index([userId]) @@index([latitude,longitude]) }
+model Category { id String @id @default(cuid()) name String slug String @unique parentId String? active Boolean @default(true) @@index([parentId,active]) }
+model Business { id String @id @default(cuid()) name String description String? category String? latitude Decimal? longitude Decimal? verificationStatus VerificationStatus @default(UNVERIFIED) createdAt DateTime @default(now()) stores Store[] @@index([latitude,longitude]) }
+model Store { id String @id @default(cuid()) businessId String name String address String? deliveryRadiusKm Decimal? minimumOrder Decimal? deliveryFee Decimal? business Business @relation(fields:[businessId],references:[id],onDelete: Cascade) products Product[] @@index([businessId]) }
+model Product { id String @id @default(cuid()) storeId String? name String description String? categoryId String? price Decimal stock Int @default(0) unit String? condition String? store Store? @relation(fields:[storeId],references:[id],onDelete:SetNull) @@index([categoryId]) @@index([storeId,stock]) }
+model Order { id String @id @default(cuid()) userId String status OrderStatus @default(PENDING) subtotal Decimal deliveryFee Decimal @default(0) tax Decimal @default(0) total Decimal createdAt DateTime @default(now()) items OrderItem[] @@index([userId,createdAt]) @@index([status,createdAt]) }
+model OrderItem { id String @id @default(cuid()) orderId String productId String quantity Int unitPrice Decimal order Order @relation(fields:[orderId],references:[id],onDelete: Cascade) @@index([orderId]) @@index([productId]) }
+model ServiceProvider { id String @id @default(cuid()) userId String bio String? verificationStatus VerificationStatus @default(UNVERIFIED) serviceRadiusKm Decimal? latitude Decimal? longitude Decimal? services ProviderService[] availability ProviderAvailability[] @@index([latitude,longitude]) }
+model Service { id String @id @default(cuid()) name String categoryId String? pricingModel PricingModel basePrice Decimal? active Boolean @default(true) providers ProviderService[] @@index([categoryId,active]) }
+model ProviderService { providerId String serviceId String provider ServiceProvider @relation(fields:[providerId],references:[id],onDelete: Cascade) service Service @relation(fields:[serviceId],references:[id],onDelete: Cascade) @@id([providerId,serviceId]) }
+model ProviderAvailability { id String @id @default(cuid()) providerId String weekday Int startMinutes Int endMinutes Int provider ServiceProvider @relation(fields:[providerId],references:[id],onDelete: Cascade) @@index([providerId,weekday]) }
+model Booking { id String @id @default(cuid()) customerId String providerId String serviceId String status BookingStatus @default(PENDING) scheduledAt DateTime? total Decimal? createdAt DateTime @default(now()) @@index([customerId,createdAt]) @@index([providerId,scheduledAt]) }
+model MarketplaceListing { id String @id @default(cuid()) sellerId String title String price Decimal condition String active Boolean @default(true) latitude Decimal? longitude Decimal? createdAt DateTime @default(now()) seller User @relation(fields:[sellerId],references:[id],onDelete: Cascade) @@index([sellerId,active]) @@index([latitude,longitude]) }
+model Review { id String @id @default(cuid()) authorId String rating Int text String? createdAt DateTime @default(now()) author User @relation(fields:[authorId],references:[id],onDelete: Cascade) @@index([authorId,createdAt]) }
+model Delivery { id String @id @default(cuid()) orderId String status String assignedPartnerId String? latitude Decimal? longitude Decimal? createdAt DateTime @default(now()) @@index([orderId]) }
+model Conversation { id String @id @default(cuid()) createdAt DateTime @default(now()) participants ConversationParticipant[] messages Message[] }
+model ConversationParticipant { conversationId String userId String conversation Conversation @relation(fields:[conversationId],references:[id],onDelete: Cascade) @@id([conversationId,userId]) }
+model Message { id String @id @default(cuid()) conversationId String senderId String body String createdAt DateTime @default(now()) conversation Conversation @relation(fields:[conversationId],references:[id],onDelete: Cascade) @@index([conversationId,createdAt]) }
+model Verification { id String @id @default(cuid()) userId String status VerificationStatus @default(PENDING) documentUrl String? reviewedAt DateTime? @@index([userId,status]) }
+model Commission { id String @id @default(cuid()) kind String rate Decimal active Boolean @default(true) @@index([kind,active]) }
+model Payout { id String @id @default(cuid()) userId String amount Decimal status String createdAt DateTime @default(now()) @@index([userId,createdAt]) }
+model AuditLog { id String @id @default(cuid()) actorId String? action String entityType String entityId String createdAt DateTime @default(now()) @@index([entityType,entityId]) }

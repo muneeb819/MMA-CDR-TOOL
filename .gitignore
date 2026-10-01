@@ -1,0 +1,27 @@
+# deps
+node_modules/
+# builds
+dist/
+build/
+# env
+.env
+*.local
+# python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+mma-cdr.db
+*.db
+# os / ide
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+# logs
+*.log
+npm-debug.log*
+# temp
+CACHEDIR.TAG
+.pytest_cache/

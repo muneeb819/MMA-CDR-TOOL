@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "MMA-CDR TOOL Monitor",
+  "version": "3.0.0",
+  "description": "MMA-CDR TOOL real-time VICIdial telemetry monitor.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://YOUR-VICIDIAL-HOST/*",
+    "wss://YOUR-API-HOST/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://YOUR-VICIDIAL-HOST/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}

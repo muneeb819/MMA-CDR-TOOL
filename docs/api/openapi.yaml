@@ -1,0 +1,38 @@
+openapi: 3.0.3
+info:
+  title: LocalHub API
+  version: 0.1.0
+paths:
+  /api/products:
+    get:
+      summary: Search nearby products
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+      responses:
+        '200': { description: Product results }
+  /api/services:
+    get:
+      summary: Search local services
+      responses:
+        '200': { description: Service results }
+  /api/orders:
+    get:
+      summary: List customer orders
+      responses:
+        '200': { description: Orders }
+    post:
+      summary: Create an order from validated product IDs
+      responses:
+        '201': { description: Order created }
+  /api/bookings:
+    post:
+      summary: Request a local service booking
+      responses:
+        '201': { description: Booking created }
+  /api/ai/assistant:
+    post:
+      summary: Ask the LocalHub AI assistant
+      responses:
+        '200': { description: Grounded assistant response }

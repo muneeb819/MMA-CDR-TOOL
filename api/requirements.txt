@@ -1,0 +1,16 @@
+fastapi==0.117.1
+uvicorn[standard]==0.36.0
+pydantic==2.11.9
+SQLAlchemy==2.0.43
+pyodbc==5.2.0
+python-multipart==0.0.20
+pandas==2.3.2
+openpyxl==3.1.5
+xlrd==2.0.2
+pyxlsb==1.0.10
+pyarrow==21.0.0
+pypdf==6.0.0
+python-docx==1.2.0
+lxml==6.0.1
+Pillow==11.3.0
+httpx==0.28.1
