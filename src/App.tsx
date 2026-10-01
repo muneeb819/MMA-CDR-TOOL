@@ -142,7 +142,8 @@ function Scrubber({ onDone }: any) {
   }
   return <div className="grid gap-4 md:grid-cols-2">
     <Card title="Universal scrubber upload" sub="Any file extension / MIME accepted. Known formats parsed, unknown binaries retained as evidence.">
-      <input type="file" accept="*/*" onChange={e => setFile(e.target.files?.[0] || null)}
+      <input type="file" accept="*/*" aria-label="Phone list file" data-testid="scrubber-file"
+        onChange={e => setFile(e.target.files?.[0] || null)}
         className="w-full rounded-2xl border-2 border-dashed border-white/15 bg-white/5 p-6 text-sm" />
       <input value={tenant} onChange={e => setTenant(e.target.value)} placeholder="Tenant GUID" className="mt-3 w-full rounded-xl bg-white/5 p-3 text-sm outline-none" />
       <input value={campaign} onChange={e => setCampaign(e.target.value)} placeholder="Campaign GUID (optional)" className="mt-2 w-full rounded-xl bg-white/5 p-3 text-sm outline-none" />
@@ -150,7 +151,7 @@ function Scrubber({ onDone }: any) {
       <p className="mt-2 text-xs text-slate-400">CSV TSV TXT LOG JSON XML HTML XLSX XLS XLSB ODS Parquet PDF DOCX ZIP images + OCR. Max {256} MB (MAX_UPLOAD_MB).</p>
     </Card>
     <Card title="Result" sub="Phone candidates → raw_records → Rust refinery → decisions">
-      {!out ? <Empty t="No upload yet" s="Result JSON appears here." /> : <pre className="max-h-[480px] overflow-auto rounded-2xl bg-black/40 p-4 text-xs leading-5">{JSON.stringify(out, null, 2)}</pre>}
+      {!out ? <Empty t="No upload yet" s="Result JSON appears here." /> : <pre data-testid="upload-result" className="max-h-[480px] overflow-auto rounded-2xl bg-black/40 p-4 text-xs leading-5">{JSON.stringify(out, null, 2)}</pre>}
     </Card>
   </div>;
 }
@@ -170,12 +171,12 @@ function Refine() {
   }
   return <div className="grid gap-4 md:grid-cols-2">
     <Card title="Normalize · Fingerprint · Score" sub="Python inline refinery mirrors Rust: normalize → fingerprint → dedupe → suppression → score.">
-      <input value={phone} onChange={e => setPhone(e.target.value)} className="w-full rounded-xl bg-white/5 p-3 font-mono text-sm outline-none" />
+      <input aria-label="Phone number" value={phone} onChange={e => setPhone(e.target.value)} className="w-full rounded-xl bg-white/5 p-3 font-mono text-sm outline-none" />
       <button onClick={run} disabled={busy} className="mt-3 w-full rounded-xl bg-amber-400 py-3 font-black text-slate-950 disabled:opacity-50">{busy ? "Scoring…" : "Refine + Score"}</button>
       <div className="mt-3 flex items-center gap-2 text-xs text-slate-400"><ShieldCheck size={14} /> Decisions: CALL / REVIEW / SUPPRESS / INVALID / DUPLICATE. Area code is a signal, not proof of location.</div>
     </Card>
     <Card title="Decision" sub="quality · contactability · risk · compliance">
-      {!out ? <Empty t="No score yet" s="Enter a phone and run." /> : <pre className="max-h-[480px] overflow-auto rounded-2xl bg-black/40 p-4 text-xs leading-5">{JSON.stringify(out, null, 2)}</pre>}
+      {!out ? <Empty t="No score yet" s="Enter a phone and run." /> : <pre data-testid="refine-result" className="max-h-[480px] overflow-auto rounded-2xl bg-black/40 p-4 text-xs leading-5">{JSON.stringify(out, null, 2)}</pre>}
     </Card>
   </div>;
 }
@@ -207,7 +208,7 @@ function TelemetryPanel({ onSent }: any) {
       {summary && <pre className="mt-2 rounded-xl bg-black/40 p-3 text-xs">{JSON.stringify(summary, null, 2)}</pre>}
     </Card>
     <Card title="AI insights" sub="Drop anomaly · queue saturation · paused ratio">
-      {!out ? <Empty t="No frame sent" s="Alerts appear here." /> : <pre className="max-h-[560px] overflow-auto rounded-2xl bg-black/40 p-4 text-xs leading-5">{JSON.stringify(out, null, 2)}</pre>}
+      {!out ? <Empty t="No frame sent" s="Alerts appear here." /> : <pre data-testid="telemetry-result" className="max-h-[560px] overflow-auto rounded-2xl bg-black/40 p-4 text-xs leading-5">{JSON.stringify(out, null, 2)}</pre>}
     </Card>
   </div>;
 }

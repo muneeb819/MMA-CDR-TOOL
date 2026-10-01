@@ -1,4 +1,6 @@
-const BASE = (import.meta as any).env?.VITE_API_URL || "http://localhost:8000";
+// Use same-origin relative URLs by default. Vite proxies /api, /health and /ws
+// to the backend, so preview browsers never try to reach the sandbox via localhost.
+const BASE = ((import.meta as any).env?.VITE_API_URL || "").replace(/\/$/, "");
 
 async function req(path: string, init?: RequestInit) {
   const r = await fetch(BASE + path, init);

@@ -1,0 +1,5 @@
+name,phone
+Valid Synthetic,+14155550132
+Invalid Text,not-a-phone
+Short Extension,204
+Partial Digits,12345
