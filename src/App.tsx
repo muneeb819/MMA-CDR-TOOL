@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Activity, Database, FileUp, Gauge, Radio, ScanSearch, ShieldCheck, Zap } from "lucide-react";
 import { api } from "./lib/api";
+import { logAction } from "./lib/usage";
 
 const DEFAULT_TENANT = "00000000-0000-0000-0000-000000000001";
 const tabs = [
@@ -15,6 +16,7 @@ type Tab = (typeof tabs)[number][0];
 
 export default function App() {
   const [tab, setTab] = useState<Tab>("overview");
+  const goTab = (t: Tab) => { setTab(t); logAction("tab_switch", { tab: t }); };
   const [health, setHealth] = useState<any>(null);
   const [uploads, setUploads] = useState<any[]>([]);
   const [telemetry, setTelemetry] = useState<any[]>([]);
@@ -57,7 +59,7 @@ export default function App() {
         </div>
         <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 pb-3">
           {tabs.map(([id, label, Icon]) => (
-            <button key={id} onClick={() => setTab(id)}
+            <button key={id} onClick={() => goTab(id)}
               className={`flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-bold ${tab === id ? "bg-amber-400 text-slate-950" : "bg-white/5 text-slate-300 hover:bg-white/10"}`}>
               <Icon size={16} />{label}
             </button>
@@ -68,7 +70,7 @@ export default function App() {
       {notice && <div className="mx-auto mt-3 max-w-7xl px-4"><div className="rounded-2xl bg-amber-400/10 p-3 text-sm text-amber-200">{notice}</div></div>}
 
       <main className="mx-auto max-w-7xl px-4 pb-20 pt-6">
-        {tab === "overview" && <Overview health={health} uploads={uploads} telemetry={telemetry} online={online} go={setTab} />}
+        {tab === "overview" && <Overview health={health} uploads={uploads} telemetry={telemetry} online={online} go={goTab} />}
         {tab === "scrubber" && <Scrubber onDone={refresh} />}
         {tab === "refine" && <Refine />}
         {tab === "telemetry" && <TelemetryPanel onSent={refresh} />}
@@ -134,8 +136,8 @@ function Scrubber({ onDone }: any) {
   async function send() {
     if (!file) return alert("Select a file first — any extension is accepted.");
     setBusy(true); setOut(null);
-    try { const r = await api.upload(file, tenant, campaign || undefined); setOut(r); onDone(); }
-    catch (e: any) { setOut({ ok: false, error: e.message }); }
+    try { const r = await api.upload(file, tenant, campaign || undefined); setOut(r); onDone(); logAction("scrubber_upload_click", { file: file.name, tenant }, r); }
+    catch (e: any) { const err = { ok: false, error: e.message }; setOut(err); logAction("scrubber_upload_click", { file: file.name }, err); }
     finally { setBusy(false); }
   }
   return <div className="grid gap-4 md:grid-cols-2">
@@ -161,8 +163,9 @@ function Refine() {
     setBusy(true);
     try {
       const [r, s] = await Promise.all([api.refine({ phone }), api.score({ phone, freshness_days: 20, attempts: 5, answered: 2 })]);
-      setOut({ refine: r, score: s });
-    } catch (e: any) { setOut({ error: e.message }); }
+      const combined = { refine: r, score: s };
+      setOut(combined); logAction("refine_score_click", { phone }, combined);
+    } catch (e: any) { const err = { error: e.message }; setOut(err); logAction("refine_score_click", { phone }, err); }
     finally { setBusy(false); }
   }
   return <div className="grid gap-4 md:grid-cols-2">
@@ -185,8 +188,8 @@ function TelemetryPanel({ onSent }: any) {
   async function send() {
     try {
       const r = await api.telemetry({ timestamp: new Date().toISOString(), tenant_id: DEFAULT_TENANT, ...form, campaign_id: form.campaign_id || undefined });
-      setOut(r); onSent();
-    } catch (e: any) { setOut({ error: e.message }); }
+      setOut(r); onSent(); logAction("telemetry_send_click", form, r);
+    } catch (e: any) { const err = { error: e.message }; setOut(err); logAction("telemetry_send_click", form, err); }
   }
   return <div className="grid gap-4 md:grid-cols-2">
     <Card title="Send telemetry frame" sub="Same contract as extension + WS /ws/v2/vici">
@@ -198,7 +201,7 @@ function TelemetryPanel({ onSent }: any) {
       <button onClick={send} className="mt-2 w-full rounded-xl bg-amber-400 py-3 font-black text-slate-950">Analyze + Persist</button>
       <div className="mt-2 flex gap-2">
         <input id="cs" placeholder="Campaign GUID for summary" className="flex-1 rounded-xl bg-white/5 p-2.5 text-sm outline-none" />
-        <button onClick={async () => { const v = (document.getElementById("cs") as HTMLInputElement).value; if (v) setSummary(await api.campaignSummary(v)); }}
+        <button onClick={async () => { const v = (document.getElementById("cs") as HTMLInputElement).value; if (v) { const s = await api.campaignSummary(v); setSummary(s); logAction("campaign_summary_click", { campaign_id: v }, s); } }}
           className="rounded-xl bg-white/10 px-4 text-sm font-bold">Summary</button>
       </div>
       {summary && <pre className="mt-2 rounded-xl bg-black/40 p-3 text-xs">{JSON.stringify(summary, null, 2)}</pre>}

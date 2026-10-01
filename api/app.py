@@ -16,6 +16,9 @@ from pydantic import BaseModel, Field
 
 from .ingestion import extract_phones, sha256_bytes, extension
 from .scoring import score_record, HistoricalStats, phone_fingerprint
+from .logging_setup import get_logger, log_event
+
+logger = get_logger()
 
 try:
     from sqlalchemy import text as sa_text
@@ -44,6 +47,40 @@ history: dict[str, deque] = defaultdict(lambda: deque(maxlen=120))
 connections: set[WebSocket] = set()
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_MB", "256")) * 1024 * 1024
 DEFAULT_TENANT = "00000000-0000-0000-0000-000000000001"
+
+logger.info("MMA-CDR TOOL API starting version=3.0.0")
+
+
+@app.middleware("http")
+async def log_requests(request, call_next):
+    started = time.time()
+    try:
+        response = await call_next(request)
+        ms = round((time.time() - started) * 1000, 1)
+        log_event("http_request", {"method": request.method, "path": request.url.path,
+                                   "query": str(request.url.query)},
+                  {"status": response.status_code, "ms": ms})
+        return response
+    except Exception as exc:
+        ms = round((time.time() - started) * 1000, 1)
+        log_event("http_error", {"method": request.method, "path": request.url.path},
+                  {"error": str(exc)[:500], "ms": ms})
+        raise
+
+
+class ClientLog(BaseModel):
+    action: str
+    detail: dict | list | str | None = None
+    result: dict | list | str | None = None
+
+
+@app.post("/api/v2/client-log")
+async def client_log(entry: ClientLog):
+    """Receives a UI click/result from the frontend and appends it to the log file."""
+    log_event(f"ui:{entry.action}",
+              entry.detail if isinstance(entry.detail, dict) else {"value": entry.detail},
+              entry.result if isinstance(entry.result, (dict, str)) else {"value": entry.result})
+    return {"ok": True}
 
 
 class Telemetry(BaseModel):
@@ -107,6 +144,26 @@ def _uid(v: str | None):
     return v or None
 
 
+def _as_uuid(value: str | None, field: str) -> str | None:
+    """Strict GUID validation for HTTP endpoints — 422 instead of a SQL 500."""
+    if not value:
+        return None
+    try:
+        return str(uuid.UUID(str(value).strip()))
+    except ValueError:
+        raise HTTPException(status_code=422, detail=f"{field} must be a GUID, got {value!r}")
+
+
+def _uuid_or_none(value: str | None) -> str | None:
+    """Lenient coercion for fire-and-forget paths (WebSocket): bad GUIDs become NULL."""
+    if not value:
+        return None
+    try:
+        return str(uuid.UUID(str(value).strip()))
+    except ValueError:
+        return None
+
+
 def persist_telemetry(m: Telemetry, result: dict) -> None:
     observed = datetime.fromisoformat(m.timestamp.replace("Z", "+00:00"))
     with dblib.db() as (conn, backend):
@@ -115,7 +172,7 @@ def persist_telemetry(m: Telemetry, result: dict) -> None:
                 INSERT dbo.telemetry_snapshots(tenant_id,campaign_id,observed_at,source_url,agents_logged_in,agents_in_call,agents_waiting,agents_paused,calls_in_queue,drop_percent,dial_level,raw_payload)
                 OUTPUT INSERTED.telemetry_id
                 VALUES(:tenant_id,:campaign_id,:observed_at,:source_url,:agents_logged_in,:agents_in_call,:agents_waiting,:agents_paused,:calls_in_queue,:drop_percent,:dial_level,:raw_payload)
-            """), {"tenant_id": _uid(m.tenant_id), "campaign_id": _uid(m.campaign_id), "observed_at": observed,
+            """), {"tenant_id": _uuid_or_none(m.tenant_id), "campaign_id": _uuid_or_none(m.campaign_id), "observed_at": observed,
                    "source_url": m.source_url, "agents_logged_in": m.agents_logged_in, "agents_in_call": m.agents_in_call,
                    "agents_waiting": m.agents_waiting, "agents_paused": m.agents_paused, "calls_in_queue": m.calls_in_queue,
                    "drop_percent": m.drop_percent, "dial_level": m.dial_level,
@@ -123,7 +180,7 @@ def persist_telemetry(m: Telemetry, result: dict) -> None:
             for a in result["alerts"]:
                 conn.execute(sa_text("""INSERT dbo.alerts(tenant_id,campaign_id,telemetry_id,severity,alert_type,message,evidence)
                     VALUES(:tenant_id,:campaign_id,:telemetry_id,:severity,:alert_type,:message,:evidence)"""),
-                    {"tenant_id": _uid(m.tenant_id), "campaign_id": _uid(m.campaign_id), "telemetry_id": row,
+                    {"tenant_id": _uuid_or_none(m.tenant_id), "campaign_id": _uuid_or_none(m.campaign_id), "telemetry_id": row,
                      "severity": a["severity"], "alert_type": a["type"], "message": a["message"], "evidence": json.dumps(result)})
         else:
             cur = conn.execute(sa_text("""INSERT INTO telemetry_snapshots(tenant_id,campaign_id,observed_at,source_url,agents_logged_in,agents_in_call,agents_waiting,agents_paused,calls_in_queue,drop_percent,dial_level,raw_payload)
@@ -163,16 +220,21 @@ async def health():
 
 @app.post("/api/v2/telemetry")
 async def telemetry(m: Telemetry):
+    m.tenant_id = _as_uuid(m.tenant_id, "tenant_id")
+    m.campaign_id = _as_uuid(m.campaign_id, "campaign_id")
     result = analyze(m)
     try:
         await asyncio.to_thread(persist_telemetry, m, result)
     except Exception as exc:
         result["persist_warning"] = str(exc)[:500]
+    log_event("api:telemetry", {"campaign_id": m.campaign_id, "drop": m.drop_percent, "queue": m.calls_in_queue},
+              {"status": result.get("status"), "alerts": len(result.get("alerts", []))})
     return result
 
 
 @app.get("/api/v2/campaigns/{campaign_id}/summary")
 async def campaign_summary(campaign_id: str):
+    campaign_id = _as_uuid(campaign_id, "campaign_id")
     def q():
         with dblib.db() as (conn, backend):
             if backend == "sqlserver":
@@ -232,6 +294,8 @@ async def refine(req: RefineRequest):
 
 @app.post("/api/v2/score")
 async def score(req: ScoreRequest):
+    req.tenant_id = _as_uuid(req.tenant_id, "tenant_id") or DEFAULT_TENANT
+    req.campaign_id = _as_uuid(req.campaign_id, "campaign_id")
     e164 = normalize_us_phone(req.phone)
     if not e164:
         result = score_record(valid=False, suppressed=False, duplicate=False, reachable=None, freshness_days=req.freshness_days, stats=HistoricalStats())
@@ -258,11 +322,15 @@ async def score(req: ScoreRequest):
                      "cs": result["compliance_status"], "re": "\n".join(result["reasons"]), "rv": result["ruleset_version"], "mv": result["model_version"]})
     except Exception as exc:
         result["persist_warning"] = str(exc)[:500]
+    log_event("api:score", {"phone": (e164 or req.phone)[:8] + "***"},
+              {"decision": result.get("decision"), "quality": result.get("quality_score")})
     return result
 
 
 @app.post("/api/v2/scrubber/upload")
 async def scrubber_upload(file: UploadFile = File(...), tenant_id: str = Form(DEFAULT_TENANT), campaign_id: str | None = Form(None)):
+    tenant_id = _as_uuid(tenant_id, "tenant_id") or DEFAULT_TENANT
+    campaign_id = _as_uuid(campaign_id, "campaign_id")
     data = await file.read(MAX_UPLOAD_BYTES + 1)
     if len(data) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail=f"File exceeds MAX_UPLOAD_MB")
@@ -310,6 +378,8 @@ async def scrubber_upload(file: UploadFile = File(...), tenant_id: str = Form(DE
                     conn.execute(sa_text("""UPDATE upload_batches SET status='COMPLETED',total_records=:t,accepted_records=:a,extracted_phone_count=:p,completed_at=datetime('now') WHERE upload_batch_id=:b"""),
                                  {"t": extracted["rows"], "a": len(phones), "p": len(phones), "b": batch_id})
         await asyncio.to_thread(persist_phones)
+        log_event("api:scrubber_upload", {"file": name, "ext": ext, "bytes": len(data)},
+                  {"batch": batch_id, "parser": extracted["parser"], "phones": len(phones)})
         return {"ok": True, "upload_batch_id": batch_id, "file_name": name, "extension": ext, "mime_type": mime,
                 "parser": extracted["parser"], "rows_scanned": extracted["rows"], "phone_candidates": len(phones),
                 "sample": phones[:10]}
