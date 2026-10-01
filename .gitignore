@@ -25,3 +25,5 @@ npm-debug.log*
 # temp
 CACHEDIR.TAG
 .pytest_cache/
+# unrelated embedded scaffold (has own .git, node_modules, .next)
+shortforge/
