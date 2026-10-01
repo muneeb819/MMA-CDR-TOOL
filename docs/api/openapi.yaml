@@ -1,38 +1,413 @@
-openapi: 3.0.3
+openapi: 3.1.0
 info:
-  title: LocalHub API
-  version: 0.1.0
+  title: MMA-CDR TOOL API
+  version: 3.0.0
 paths:
-  /api/products:
+  /api/v2/client-log:
+    post:
+      summary: Client Log
+      description: Receives a UI click/result from the frontend and appends it to
+        the log file.
+      operationId: client_log_api_v2_client_log_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientLog'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /health:
     get:
-      summary: Search nearby products
+      summary: Health
+      operationId: health_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /api/v2/telemetry:
+    post:
+      summary: Telemetry
+      operationId: telemetry_api_v2_telemetry_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Telemetry'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v2/campaigns/{campaign_id}/summary:
+    get:
+      summary: Campaign Summary
+      operationId: campaign_summary_api_v2_campaigns__campaign_id__summary_get
       parameters:
-        - in: query
-          name: q
-          schema: { type: string }
+      - name: campaign_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Campaign Id
       responses:
-        '200': { description: Product results }
-  /api/services:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v2/telemetry/recent:
     get:
-      summary: Search local services
+      summary: Telemetry Recent
+      operationId: telemetry_recent_api_v2_telemetry_recent_get
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 20
+          title: Limit
       responses:
-        '200': { description: Service results }
-  /api/orders:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v2/uploads/recent:
     get:
-      summary: List customer orders
+      summary: Uploads Recent
+      operationId: uploads_recent_api_v2_uploads_recent_get
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 20
+          title: Limit
       responses:
-        '200': { description: Orders }
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v2/refine:
     post:
-      summary: Create an order from validated product IDs
+      summary: Refine
+      operationId: refine_api_v2_refine_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefineRequest'
+        required: true
       responses:
-        '201': { description: Order created }
-  /api/bookings:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v2/score:
     post:
-      summary: Request a local service booking
+      summary: Score
+      operationId: score_api_v2_score_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScoreRequest'
+        required: true
       responses:
-        '201': { description: Booking created }
-  /api/ai/assistant:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v2/scrubber/upload:
     post:
-      summary: Ask the LocalHub AI assistant
+      summary: Scrubber Upload
+      operationId: scrubber_upload_api_v2_scrubber_upload_post
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Body_scrubber_upload_api_v2_scrubber_upload_post'
+        required: true
       responses:
-        '200': { description: Grounded assistant response }
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+components:
+  schemas:
+    Body_scrubber_upload_api_v2_scrubber_upload_post:
+      properties:
+        file:
+          type: string
+          format: binary
+          title: File
+        tenant_id:
+          type: string
+          title: Tenant Id
+          default: 00000000-0000-0000-0000-000000000001
+        campaign_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Campaign Id
+      type: object
+      required:
+      - file
+      title: Body_scrubber_upload_api_v2_scrubber_upload_post
+    ClientLog:
+      properties:
+        action:
+          type: string
+          maxLength: 100
+          minLength: 1
+          title: Action
+        detail:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - items: {}
+            type: array
+          - type: string
+          - type: 'null'
+          title: Detail
+        result:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - items: {}
+            type: array
+          - type: string
+          - type: 'null'
+          title: Result
+      type: object
+      required:
+      - action
+      title: ClientLog
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    RefineRequest:
+      properties:
+        phone:
+          type: string
+          maxLength: 64
+          minLength: 1
+          title: Phone
+        lead_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Lead Id
+        duration_seconds:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Duration Seconds
+        suppressed_hashes:
+          items:
+            type: string
+          type: array
+          title: Suppressed Hashes
+          default: []
+      type: object
+      required:
+      - phone
+      title: RefineRequest
+    ScoreRequest:
+      properties:
+        phone:
+          type: string
+          maxLength: 64
+          minLength: 1
+          title: Phone
+        tenant_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Tenant Id
+        campaign_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Campaign Id
+        reachable:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Reachable
+        freshness_days:
+          type: number
+          title: Freshness Days
+          default: 0
+        attempts:
+          type: integer
+          title: Attempts
+          default: 0
+        answered:
+          type: integer
+          title: Answered
+          default: 0
+        risk_signals:
+          items:
+            type: string
+          type: array
+          title: Risk Signals
+          default: []
+      type: object
+      required:
+      - phone
+      title: ScoreRequest
+    Telemetry:
+      properties:
+        timestamp:
+          type: string
+          title: Timestamp
+        tenant_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Tenant Id
+        campaign_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Campaign Id
+        source_url:
+          type: string
+          maxLength: 1000
+          title: Source Url
+        agents_logged_in:
+          type: integer
+          minimum: 0.0
+          title: Agents Logged In
+        agents_in_call:
+          type: integer
+          minimum: 0.0
+          title: Agents In Call
+        agents_waiting:
+          type: integer
+          minimum: 0.0
+          title: Agents Waiting
+        agents_paused:
+          type: integer
+          minimum: 0.0
+          title: Agents Paused
+        calls_in_queue:
+          type: integer
+          minimum: 0.0
+          title: Calls In Queue
+        drop_percent:
+          type: number
+          minimum: 0.0
+          title: Drop Percent
+        dial_level:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Dial Level
+        raw:
+          additionalProperties: true
+          type: object
+          title: Raw
+          default: {}
+      type: object
+      required:
+      - timestamp
+      - source_url
+      - agents_logged_in
+      - agents_in_call
+      - agents_waiting
+      - agents_paused
+      - calls_in_queue
+      - drop_percent
+      title: Telemetry
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError

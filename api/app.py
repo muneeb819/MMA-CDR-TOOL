@@ -12,7 +12,7 @@ from typing import Any
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from .ingestion import extract_phones, sha256_bytes, extension
 from .scoring import score_record, HistoricalStats, phone_fingerprint
@@ -69,7 +69,7 @@ async def log_requests(request, call_next):
 
 
 class ClientLog(BaseModel):
-    action: str
+    action: str = Field(min_length=1, max_length=100)
     detail: dict | list | str | None = None
     result: dict | list | str | None = None
 
@@ -87,7 +87,7 @@ class Telemetry(BaseModel):
     timestamp: str
     tenant_id: str | None = None
     campaign_id: str | None = None
-    source_url: str
+    source_url: str = Field(max_length=1000)
     agents_logged_in: int = Field(ge=0)
     agents_in_call: int = Field(ge=0)
     agents_waiting: int = Field(ge=0)
@@ -97,16 +97,25 @@ class Telemetry(BaseModel):
     dial_level: float | None = None
     raw: dict = {}
 
+    @field_validator("timestamp")
+    @classmethod
+    def timestamp_must_be_parseable(cls, value: str) -> str:
+        try:
+            datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError("timestamp must be an ISO-8601 datetime") from exc
+        return value
+
 
 class RefineRequest(BaseModel):
-    phone: str
+    phone: str = Field(min_length=1, max_length=64)
     lead_id: str | None = None
     duration_seconds: int | None = None
     suppressed_hashes: list[str] = []
 
 
 class ScoreRequest(BaseModel):
-    phone: str
+    phone: str = Field(min_length=1, max_length=64)
     tenant_id: str | None = None
     campaign_id: str | None = None
     reachable: bool | None = None
@@ -197,7 +206,9 @@ def persist_telemetry(m: Telemetry, result: dict) -> None:
                      "severity": a["severity"], "alert_type": a["type"], "message": a["message"], "evidence": json.dumps(result)})
 
 
-US_PHONE_DIGITS = re.compile(r"\D")
+# Canonical US phone parsing intentionally accepts ASCII digits only. Unicode
+# numeric characters must not be silently canonicalized into phone identifiers.
+US_PHONE_DIGITS = re.compile(r"[^0-9]")
 
 
 def normalize_us_phone(raw: str) -> str | None:
@@ -338,6 +349,13 @@ async def scrubber_upload(file: UploadFile = File(...), tenant_id: str = Form(DE
     digest = sha256_bytes(data)
     ext = extension(name)
     mime = file.content_type or "application/octet-stream"
+    # Keep upload metadata within the authoritative SQL Server column widths.
+    if len(name) > 512:
+        raise HTTPException(status_code=422, detail="Filename must be at most 512 characters")
+    if len(ext) > 32:
+        raise HTTPException(status_code=422, detail="File extension must be at most 32 characters")
+    if len(mime) > 255:
+        raise HTTPException(status_code=422, detail="MIME type must be at most 255 characters")
     batch_id = str(uuid.uuid4())
 
     def persist_batch():
@@ -399,11 +417,25 @@ async def vici_ws(ws: WebSocket):
     connections.add(ws)
     try:
         while True:
-            import json as _j
-            payload = _j.loads(await ws.receive_text())
-            m = Telemetry.model_validate(payload)
+            frame = await ws.receive_text()
+            try:
+                payload = json.loads(frame)
+            except json.JSONDecodeError:
+                await ws.send_json({"error": "invalid_json"})
+                continue
+            try:
+                m = Telemetry.model_validate(payload)
+            except ValidationError as exc:
+                await ws.send_json({"error": "invalid_telemetry", "detail": str(exc)[:1000]})
+                continue
             result = analyze(m)
-            await asyncio.to_thread(persist_telemetry, m, result)
+            try:
+                await asyncio.to_thread(persist_telemetry, m, result)
+            except Exception:
+                # Keep a transient database failure from killing the socket loop;
+                # do not send connection details or credentials to the client.
+                await ws.send_json({"error": "telemetry_persistence_failed"})
+                continue
             await ws.send_json({"raw": m.model_dump(), "ai_insights": result})
     except WebSocketDisconnect:
         connections.discard(ws)

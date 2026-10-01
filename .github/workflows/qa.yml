@@ -1,0 +1,91 @@
+name: MMA-CDR QA
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mma-cdr-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  playwright:
+    name: Build and automated QA (SQLite test backend)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI: 'true'
+      MMA_CDR_USE_SQLITE: '1'
+      MAX_UPLOAD_MB: '8'
+      WSS_ALLOWED_ORIGINS: '*'
+      RUN_SQLSERVER_TESTS: '0'
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: api/requirements.txt
+
+      - name: Install Python API dependencies
+        run: python -m pip install -r api/requirements.txt
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium and OS dependencies
+        run: npx playwright install --with-deps chromium
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Check test TypeScript
+        run: npm run test:types
+
+      - name: Smoke suite
+        run: npm run test:smoke
+
+      - name: API suite
+        run: npm run test:api
+
+      - name: Refinery and provider suite
+        run: npm run test:refinery
+
+      - name: E2E desktop and mobile suite
+        run: npm run test:e2e
+
+      - name: Database suite (SQL Server is opt-in; SQLite runs in CI)
+        run: npm run test:db
+
+      - name: Security suite
+        run: npm run test:security
+
+      - name: Regression suite
+        run: npm run test:regression
+
+      - name: Complete suite
+        run: npm run test:all
+
+      - name: Upload Playwright reports and failure artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mma-cdr-playwright-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            playwright-report/
+            test-results/

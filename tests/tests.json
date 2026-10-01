@@ -1,91 +1,122 @@
 [
   {
-    "name": "Discover and order a nearby product",
+    "name": "MMA-CDR API health and route discovery",
     "sanity": true,
-    "viewport": "mobile",
-    "covers": [
-      "customer discovery",
-      "product search",
-      "server-side pricing",
-      "order creation",
-      "orders persistence"
-    ],
-    "description": "Verifies the main shopping flow from search through server-validated checkout and order history.",
-    "steps": [
-      "Open LocalHub",
-      "Search for Basmati Rice",
-      "Add Basmati Rice",
-      "Checkout with COD",
-      "Open Orders"
-    ],
-    "expected": "A confirmed order appears with a server-calculated PKR total."
+    "tags": ["@api", "@smoke", "@regression"],
+    "covers": ["FastAPI health", "active database backend", "OpenAPI route contract"],
+    "spec": "tests/api/health.spec.ts",
+    "expected": "Health reports status ok with the active database name; OpenAPI lists real MMA-CDR routes and no stale LocalHub routes."
   },
   {
-    "name": "Request a local service",
-    "viewport": "mobile",
-    "covers": [
-      "service marketplace",
-      "provider discovery",
-      "booking creation"
-    ],
-    "description": "Verifies a customer can discover and request a local professional.",
-    "steps": [
-      "Open Services",
-      "Choose Emergency Plumbing",
-      "Tap Book now",
-      "Open Orders"
-    ],
-    "expected": "A pending booking activity appears in Orders."
+    "name": "MMA-CDR branded navigation and demo/live mode",
+    "sanity": true,
+    "tags": ["@e2e", "@smoke", "@regression"],
+    "covers": ["Overview", "Scrubber Upload", "Refine & Score", "Telemetry", "Database / SSMS", "responsive navigation"],
+    "spec": "tests/e2e/navigation.spec.ts",
+    "expected": "The actual five UI tabs render and remain keyboard- and mobile-discoverable."
   },
   {
-    "name": "Use role dashboards",
-    "viewport": "desktop",
-    "covers": [
-      "authentication",
-      "role selection",
-      "seller dashboard",
-      "provider dashboard",
-      "admin dashboard"
-    ],
-    "description": "Verifies development role access exposes the corresponding operational dashboard surfaces.",
-    "steps": [
-      "Open account",
-      "Choose ADMIN",
-      "Continue",
-      "Open Admin dashboard"
-    ],
-    "expected": "The Admin control center is displayed with management and analytics sections."
+    "name": "Universal file ingestion and raw staging",
+    "sanity": true,
+    "tags": ["@api", "@scrubber", "@phone-extraction", "@smoke", "@regression"],
+    "covers": ["CSV", "TSV", "TXT", "LOG", "JSON", "JSONL", "XML", "HTML", "XLSX", "XLS/XLSB/ODS controlled parser failures", "Parquet", "PDF", "DOCX", "ZIP", "image OCR fallback", "unknown extension", "size limit", "malformed formats"],
+    "spec": "tests/api/scrubber.spec.ts",
+    "expected": "Upload responses report the parser and extracted-candidate count defined by api/ingestion.py; invalid parses and oversize files return controlled errors."
   },
   {
-    "name": "Use grounded AI assistance",
-    "viewport": "desktop",
-    "covers": [
-      "AI assistant",
-      "catalog-grounded recommendations",
-      "AI failure-safe behavior"
-    ],
-    "description": "Verifies natural-language discovery is answered using platform catalog context.",
-    "steps": [
-      "Open Ask LocalHub AI",
-      "Ask for groceries under Rs. 3000",
-      "Submit"
-    ],
-    "expected": "A grounded response is rendered without claiming an order or payment."
+    "name": "Python phone normalization, fingerprint and suppression request input",
+    "sanity": true,
+    "tags": ["@api", "@refinery", "@suppression", "@smoke", "@regression"],
+    "covers": ["US normalization", "equivalent formats", "SHA-256", "invalid phone", "request-supplied suppression hash", "duration reason"],
+    "spec": "tests/api/refine.spec.ts",
+    "expected": "Formatting-equivalent US values share canonical E.164 and fingerprint; only the implemented suppression-hash contract returns SUPPRESS."
   },
   {
-    "name": "Reject invalid checkout",
-    "viewport": "desktop",
-    "covers": [
-      "validation guardrail",
-      "out-of-stock protection",
-      "empty cart protection"
-    ],
-    "description": "Verifies invalid checkout input cannot create an order.",
-    "steps": [
-      "Open Shop",
-      "Do not add products",
-      "Attempt checkout if available"
-    ],
-    "expected": "LocalHub prevents the invalid operation and explains that the cart is empty."
+    "name": "Actual scoring decision paths and boundaries",
+    "sanity": true,
+    "tags": ["@api", "@scoring", "@smoke", "@regression"],
+    "covers": ["CALL", "REVIEW", "INVALID", "reachability", "freshness thresholds", "attempt history", "risk score"],
+    "spec": "tests/api/refine.spec.ts",
+    "expected": "Responses contain actual score fields and follow source-code thresholds; REST does not pretend to set duplicate or persisted-DNC flags."
+  },
+  {
+    "name": "Telemetry analysis, persistence and alerts",
+    "sanity": true,
+    "tags": ["@api", "@telemetry", "@smoke", "@regression"],
+    "covers": ["valid and invalid frames", "drop anomaly", "queue saturation", "paused ratio", "summary", "recent snapshots", "client logs"],
+    "spec": "tests/api/telemetry.spec.ts",
+    "expected": "Analysis values and alert types match api/app.py; valid snapshots are retrievable and persistence failures do not become hidden passing database assertions."
+  },
+  {
+    "name": "Upload-to-persisted decision and VICIdial telemetry-to-dashboard workflows",
+    "sanity": false,
+    "tags": ["@api", "@workflow", "@smoke", "@regression"],
+    "covers": ["multipart upload", "extracted candidate", "refinement", "scoring", "persisted decision", "telemetry alert analysis", "persisted alerts", "dashboard recent snapshot", "campaign summary"],
+    "spec": "tests/api/workflows.spec.ts",
+    "expected": "Actual upload/refine/score/telemetry/dashboard routes are sequenced; local isolated SQLite confirms staged raw records, decision persistence, snapshots and alert persistence."
+  },
+  {
+    "name": "VICIdial WebSocket frame, validation, reconnect and recovery",
+    "sanity": false,
+    "tags": ["@api", "@telemetry", "@security", "@regression"],
+    "covers": ["connect", "valid frames", "malformed JSON", "invalid payload", "sequential frames", "disconnect", "reconnect"],
+    "spec": "tests/api/websocket.spec.ts",
+    "expected": "Valid messages receive raw telemetry and insights; malformed messages receive controlled error frames while the socket/API remains usable."
+  },
+  {
+    "name": "SQLite development fallback persistence and constraints",
+    "sanity": false,
+    "tags": ["@database", "@regression"],
+    "covers": ["actual SQLite schema", "upload staging", "score persistence", "telemetry/alert persistence", "unique key", "rollback"],
+    "spec": "tests/database/sqlite.spec.ts",
+    "expected": "Only the seven tables currently defined in api/db.py are asserted; this is not represented as SQL Server compatibility."
+  },
+  {
+    "name": "SQL Server DDL source and optional dedicated integration checks",
+    "sanity": false,
+    "tags": ["@database", "@regression"],
+    "covers": ["schema tables", "columns/types", "constraints", "indexes", "procedures", "views", "transactions", "referential integrity"],
+    "spec": "tests/database/schema.spec.ts and tests/database/sqlserver.spec.ts",
+    "expected": "Static DDL checks always run; live integration runs only against an explicitly designated *_test or *_qa database and uses rolled-back transactions."
+  },
+  {
+    "name": "Rust refinery and Python utility contracts",
+    "sanity": false,
+    "tags": ["@refinery", "@regression"],
+    "covers": ["Rust health/refine/batch routes", "normalization", "batch dedupe", "optional parity", "MockProvider", "waterfall order and failures"],
+    "spec": "tests/refinery/refinery.spec.ts and tests/refinery/providers.spec.ts",
+    "expected": "Rust live checks are skipped when no Rust service is configured; provider checks use offline stubs and never call paid services."
+  },
+  {
+    "name": "VICIdial extension telemetry mapping and popup safety",
+    "sanity": false,
+    "tags": ["@security", "@regression"],
+    "covers": ["MV3 manifest", "scraped telemetry labels", "popup display", "XSS-safe text insertion"],
+    "spec": "tests/extension/monitor.spec.ts",
+    "expected": "The worker/content contract matches the source, and untrusted alert text is rendered as text rather than HTML."
+  },
+  {
+    "name": "Measured ingestion and concurrency regression",
+    "sanity": false,
+    "tags": ["@performance", "@api", "@regression"],
+    "covers": ["10-50000 record timings", "parallel upload", "parallel refine", "parallel score", "parallel telemetry", "request recovery"],
+    "spec": "tests/api/performance-concurrency.spec.ts",
+    "expected": "Measured timings are attached without inventing a fixed SLO; controlled parallel requests return expected statuses."
+  },
+  {
+    "name": "Non-destructive security and metadata boundaries",
+    "sanity": false,
+    "tags": ["@security", "@api", "@regression"],
+    "covers": ["CORS configuration", "malformed multipart", "oversized logical fields", "SQL-like input", "Unicode", "path traversal ZIP", "XSS-safe rendering"],
+    "spec": "tests/api/security.spec.ts, tests/api/scrubber.spec.ts, tests/e2e/resilience.spec.ts",
+    "expected": "Inputs are validated/handled according to current contracts; wildcard CORS and missing auth are documented risks, not reported as secured features."
+  },
+  {
+    "name": "End-to-end scrub-to-score and VICIdial telemetry workflow",
+    "sanity": true,
+    "tags": ["@e2e", "@smoke", "@regression"],
+    "covers": ["branded UI", "CSV upload", "candidate extraction", "raw staging", "refine", "score", "telemetry alerts", "dashboard", "database guidance"],
+    "spec": "tests/e2e/full-flow.spec.ts",
+    "expected": "The UI's separate implemented API actions complete and their SQLite side effects are checked when the isolated SQLite service is active."
   }
 ]

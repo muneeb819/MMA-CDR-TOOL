@@ -3,6 +3,9 @@ node_modules/
 # builds
 dist/
 build/
+playwright-report/
+test-results/
+tests/.artifacts/
 # env
 .env
 *.local

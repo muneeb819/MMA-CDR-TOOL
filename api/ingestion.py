@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 PHONE_RE = re.compile(r"(?<!\d)(?:\+?\d[\d\s().\-]{6,}\d)(?!\d)")
+DATE_RE = re.compile(r"(?:19|20)\d{2}[-/.]\d{1,2}[-/.]\d{1,2}")
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -27,7 +28,15 @@ def extension(name: str) -> str:
 
 
 def _phones_from_text(text: str) -> list[str]:
-    return [m.group(0).strip() for m in PHONE_RE.finditer(text or "")]
+    candidates = []
+    for match in PHONE_RE.finditer(text or ""):
+        value = match.group(0).strip()
+        # ISO/slash/dash dates satisfy the broad phone candidate regex, but are
+        # not phone candidates and commonly occur in CDR timestamps.
+        if DATE_RE.fullmatch(value):
+            continue
+        candidates.append(value)
+    return candidates
 
 
 def _flatten(value: Any) -> str:
@@ -67,10 +76,14 @@ def extract_text_rows(filename: str, data: bytes) -> tuple[list[str], str]:
             else:
                 rows = [_flatten(obj)]
         return rows, "JSON"
-    if ext in {"xml", "html", "htm", "xhtml"}:
+    if ext == "xml":
         from lxml import etree
-        root = etree.fromstring(data, parser=etree.XMLParser(recover=True, resolve_entities=False))
+        root = etree.fromstring(data, parser=etree.XMLParser(recover=True, resolve_entities=False, no_network=True))
         return [" ".join(root.itertext())], "XML"
+    if ext in {"html", "htm", "xhtml"}:
+        from lxml import html
+        root = html.fromstring(data, parser=html.HTMLParser(recover=True, no_network=True))
+        return [" ".join(root.itertext())], "HTML"
     if ext in {"xlsx", "xls", "xlsb", "ods"}:
         import pandas as pd
         engine = {"xlsx": "openpyxl", "xls": "xlrd", "xlsb": "pyxlsb"}.get(ext)

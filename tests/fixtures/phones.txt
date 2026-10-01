@@ -1,0 +1,2 @@
+Call record: customer phone +1 (415) 555-0132; callback at 212-555-0111.
+Extension 204 is intentionally not a phone number.
