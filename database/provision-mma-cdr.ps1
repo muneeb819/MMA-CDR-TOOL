@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
   throw "Not elevated. Re-run this script as Administrator."
 }
-$root = Split-Path -Parent $MyInvocation.MyCommand.Path
+$root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $schema = Join-Path $root "database\mma-cdr-sqlserver.sql"
 if (-not (Test-Path $schema)) { throw "Schema not found: $schema" }
 $winLogin = "$env:USERDOMAIN\$env:USERNAME"
